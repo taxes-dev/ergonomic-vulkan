@@ -19,7 +19,7 @@ You will need:
 * The [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) with VMA and shaderc_combined
 
 If you're building the example program, you'll also need:
-* [SDL2](https://wiki.libsdl.org/SDL2/Installation)
+* [SDL2](https://wiki.libsdl.org/SDL2/Installation) with Vulkan support
 
 Running CMake with the root of the repo as the source dir will configure everything for compilation. There are a few variables to be aware of:
 * `VULKAN_SDK` - this environment variable should be set by the SDK's `setup-env.sh` script
@@ -32,4 +32,4 @@ Distributed under an [MIT license](LICENSE.md). You're welcome to copy, modify, 
 
 vk-bootstrap distrubted under [MIT license](https://github.com/charles-lunarg/vk-bootstrap/blob/master/LICENSE.txt).
 
-Vulkan/VMA and other dependencies have their own licenses.
+Vulkan/VMA, SDL2, and other dependencies have their own licenses.
