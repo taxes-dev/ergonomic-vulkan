@@ -4,6 +4,9 @@ endif()
 
 add_library(ergovk STATIC
     ErrorToString.cpp
+    Swapchain.cpp
+    VkImageHandle.cpp
+    VkImageViewHandle.cpp
     VmaImpl.cpp
     VulkanInstance.cpp
     VulkanInstanceBuilder.cpp

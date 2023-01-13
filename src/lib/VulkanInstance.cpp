@@ -9,6 +9,7 @@ namespace ergovk
 		{
 			vkDeviceWaitIdle(this->device);
 		}
+        this->m_swapchain.reset();
 		if (this->m_allocator)
 		{
 			vmaDestroyAllocator(this->m_allocator);

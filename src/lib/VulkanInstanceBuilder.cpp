@@ -35,6 +35,14 @@ namespace ergovk
 		return *this;
 	}
 
+	VulkanInstanceBuilder& VulkanInstanceBuilder::set_draw_extent(VkExtent2D extent)
+	{
+		assert(extent.height > 0);
+		assert(extent.width > 0);
+		this->m_extent = extent;
+		return *this;
+	}
+
 	Result<std::unique_ptr<VulkanInstance>, InitializeError> VulkanInstanceBuilder::build() const
 	{
 		auto build_ret = this->m_builder->build();
@@ -52,6 +60,7 @@ namespace ergovk
 			}
 
 			// find a suitable GPU
+			// TODO: allow selection of a specific GPU
 			vkb::PhysicalDeviceSelector selector{ *build_ret };
 			auto selector_ret = selector							  //
 									.set_minimum_version(1, 1)		  //
@@ -102,6 +111,15 @@ namespace ergovk
 			{
 				return { InitializeError::AllocatorCreate };
 			}
+
+			// create swapchain
+			auto swapchain_ret = Swapchain::create(instance->m_allocator, instance->m_physical_device, instance->device,
+				instance->m_surface, this->m_extent);
+			if (is_error(swapchain_ret))
+			{
+				return { InitializeError::SwapchainCreate };
+			}
+			instance->m_swapchain = unwrap(swapchain_ret);
 
 			return { std::move(instance) };
 		}
