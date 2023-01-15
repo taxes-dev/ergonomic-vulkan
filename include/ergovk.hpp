@@ -51,6 +51,12 @@ namespace ergovk
      */
 	std::string_view error_to_string(InitializeError error);
 
+	/** @brief Convert an error enum to a human readable string
+     * @param error ergovk::SwapchainCreateError value
+     * @return std::string_view
+     */
+	std::string_view error_to_string(SwapchainCreateError error);
+
 	/** @brief Constraint to validate if \p T is an enumeration
      * @tparam T a type to check
      * @return true if \p T is an enumeration, otherwise false
