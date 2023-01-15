@@ -64,9 +64,9 @@ int main(int argc, char** argv)
 			return 1;
 		}
 
-		auto instance = unwrap(instance_ret);
+		VulkanInstance instance = unwrap(instance_ret);
 
-		std::cout << "GPU minimum buffer alignment of " << instance->get_min_uniform_buffer_offset_alignment()
+		std::cout << "GPU minimum buffer alignment of " << instance.get_min_uniform_buffer_offset_alignment()
 				  << " byte(s)" << std::endl;
 
 		// loop

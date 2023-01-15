@@ -1,7 +1,6 @@
 #pragma once
 #include <concepts>
 #include <functional>
-#include <memory>
 #include <string_view>
 #include <variant>
 #include <vector>
@@ -130,6 +129,10 @@ namespace ergovk
 	{
 	public:
 		/**
+     * @brief Create a new, empty ergovk::VkImageHandle.
+    */
+		VkImageHandle() noexcept {};
+		/**
          * @brief Create a new ergovk::VkImageHandle.
          * @param allocator VmaAllocator
          * @param device VkDevice
@@ -144,19 +147,11 @@ namespace ergovk
 			assert(image != VK_NULL_HANDLE);
 			assert(allocation != VK_NULL_HANDLE);
 		};
-		~VkImageHandle();
+		~VkImageHandle() { this->destroy(); }
 		VkImageHandle(const VkImageHandle&) = delete;
-		VkImageHandle(VkImageHandle&& other)
-		{
-			this->m_allocator = other.m_allocator;
-			this->m_device = other.m_device;
-			this->allocation = other.allocation;
-			this->image = other.image;
-			other.allocation = VK_NULL_HANDLE;
-			other.image = VK_NULL_HANDLE;
-		};
+		VkImageHandle(VkImageHandle&& other) noexcept { *this = std::move(other); };
 		VkImageHandle& operator=(const VkImageHandle&) = delete;
-		VkImageHandle& operator=(VkImageHandle&& other)
+		VkImageHandle& operator=(VkImageHandle&& other) noexcept
 		{
 			this->m_allocator = other.m_allocator;
 			this->m_device = other.m_device;
@@ -173,10 +168,15 @@ namespace ergovk
          * @param device VkDevice
          * @param create_info VkImageCreateInfo
          * @param allocation_create_info VmaAllocationCreateInfo
-         * @return std::unique_ptr<ergovk::VkImageHandle> on success, otherwise VkResult
+         * @return ergovk::VkImageHandle on success, otherwise VkResult
         */
-		static Result<std::unique_ptr<VkImageHandle>, VkResult> create(VmaAllocator allocator, VkDevice device,
+		static Result<VkImageHandle, VkResult> create(VmaAllocator allocator, VkDevice device,
 			VkImageCreateInfo create_info, VmaAllocationCreateInfo allocation_create_info);
+
+		/**
+         * @brief Explicitly destroys all of the resources managed by this instance.
+        */
+		void destroy();
 
 		/**
          * @brief Handle to the image buffer.
@@ -189,7 +189,6 @@ namespace ergovk
 		VmaAllocation allocation{ VK_NULL_HANDLE };
 
 	private:
-		VkImageHandle(){};
 		VmaAllocator m_allocator{ VK_NULL_HANDLE };
 		VkDevice m_device{ VK_NULL_HANDLE };
 	};
@@ -201,6 +200,10 @@ namespace ergovk
 	{
 	public:
 		/**
+     * @brief Create a new, empty ergovk::VkImageViewHandle.
+    */
+		VkImageViewHandle() noexcept {};
+		/**
          * Create a new ergovk::VkImageViewHandle.
          * @param device VkDevice
          * @param image_view VkImageView
@@ -210,16 +213,11 @@ namespace ergovk
 			assert(device != VK_NULL_HANDLE);
 			assert(image_view != VK_NULL_HANDLE);
 		};
-		~VkImageViewHandle();
+		~VkImageViewHandle() { this->destroy(); };
 		VkImageViewHandle(const VkImageViewHandle&) = delete;
-		VkImageViewHandle(VkImageViewHandle&& other)
-		{
-			this->m_device = other.m_device;
-			this->image_view = other.image_view;
-			other.image_view = VK_NULL_HANDLE;
-		}
+		VkImageViewHandle(VkImageViewHandle&& other) noexcept { *this = std::move(other); }
 		VkImageViewHandle& operator=(const VkImageViewHandle&) = delete;
-		VkImageViewHandle& operator=(VkImageViewHandle&& other)
+		VkImageViewHandle& operator=(VkImageViewHandle&& other) noexcept
 		{
 			this->m_device = other.m_device;
 			this->image_view = other.image_view;
@@ -231,10 +229,14 @@ namespace ergovk
          * @brief Allocates a new image view and returns the handle.
          * @param device VkDevice
          * @param create_info VkImageViewCreateInfo
-         * @return std::unique_ptr<ergovk::VkImageViewHandle> on success, otherwise VkResult
+         * @return ergovk::VkImageViewHandle on success, otherwise VkResult
         */
-		static Result<std::unique_ptr<VkImageViewHandle>, VkResult> create(
-			VkDevice device, VkImageViewCreateInfo create_info);
+		static Result<VkImageViewHandle, VkResult> create(VkDevice device, VkImageViewCreateInfo create_info);
+
+		/**
+         * @brief Explicitly destroys all of the resources managed by this instance.
+        */
+		void destroy();
 
 		/**
          * @brief Handle to the image view.
@@ -242,7 +244,6 @@ namespace ergovk
 		VkImageView image_view{ VK_NULL_HANDLE };
 
 	private:
-		VkImageViewHandle(){};
 		VkDevice m_device{ VK_NULL_HANDLE };
 	};
 
@@ -252,7 +253,27 @@ namespace ergovk
 	class Swapchain
 	{
 	public:
-		~Swapchain();
+		/**
+         * @brief Creates a new, empty ergovk::Swapchain.
+        */
+		Swapchain() noexcept {};
+		~Swapchain() { this->destroy(); };
+		Swapchain(const Swapchain&) = delete;
+		Swapchain(Swapchain&& other) noexcept { *this = std::move(other); };
+		Swapchain& operator=(const Swapchain&) = delete;
+		Swapchain& operator=(Swapchain&& other) noexcept
+		{
+			this->m_device = other.m_device;
+			this->m_swapchain = other.m_swapchain;
+			other.m_swapchain = VK_NULL_HANDLE;
+			this->m_images = std::move(other.m_images);
+			this->m_image_views = std::move(other.m_image_views);
+			this->m_image_format = other.m_image_format;
+			this->m_depth_format = other.m_depth_format;
+			this->m_depth_image = std::move(other.m_depth_image);
+			this->m_depth_image_view = std::move(other.m_depth_image_view);
+			return *this;
+		};
 
 		/**
          * @brief Allocates a new swapchain with images and views as well as a depth buffer.
@@ -261,9 +282,15 @@ namespace ergovk
          * @param device VkDevice
          * @param surface VkSurfaceKHR
          * @param extent VkExtent2D with the dimensions of \p surface
+         * @return ergovk::Swapchain on success, otherwise VkResult
         */
-		static Result<std::unique_ptr<Swapchain>, SwapchainCreateError> create(VmaAllocator allocator,
-			VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface, VkExtent2D extent);
+		static Result<Swapchain, SwapchainCreateError> create(VmaAllocator allocator, VkPhysicalDevice physical_device,
+			VkDevice device, VkSurfaceKHR surface, VkExtent2D extent);
+
+		/**
+         * @brief Explicitly destroys all of the resources managed by this instance.
+        */
+		void destroy();
 
 	private:
 		VkDevice m_device{ VK_NULL_HANDLE };
@@ -273,10 +300,8 @@ namespace ergovk
 		std::vector<VkImageViewHandle> m_image_views{};
 		VkFormat m_image_format{ VkFormat::VK_FORMAT_UNDEFINED };
 		VkFormat m_depth_format{ VkFormat::VK_FORMAT_UNDEFINED };
-		std::unique_ptr<VkImageHandle> m_depth_image{ nullptr };
-		std::unique_ptr<VkImageViewHandle> m_depth_image_view{ nullptr };
-
-		Swapchain(){};
+		VkImageHandle m_depth_image{};
+		VkImageViewHandle m_depth_image_view{};
 	};
 
 	/**
@@ -289,14 +314,35 @@ namespace ergovk
 		friend class VulkanInstanceBuilder;
 
 	public:
-		VkInstance instance{ VK_NULL_HANDLE };
-		VkDevice device{ VK_NULL_HANDLE };
-
 		VulkanInstance(const VulkanInstance&) = delete;
-		VulkanInstance(VulkanInstance&&) = default;
-		~VulkanInstance();
+		VulkanInstance(VulkanInstance&& other) noexcept { *this = std::move(other); };
+		~VulkanInstance() { this->destroy(); }
 		VulkanInstance& operator=(const VulkanInstance&) = delete;
-		VulkanInstance& operator=(VulkanInstance&&) = default;
+		VulkanInstance& operator=(VulkanInstance&& other) noexcept
+		{
+			this->instance = other.instance;
+			other.instance = VK_NULL_HANDLE;
+			this->device = other.device;
+			other.device = VK_NULL_HANDLE;
+			this->m_debug_messenger = other.m_debug_messenger;
+			other.m_debug_messenger = VK_NULL_HANDLE;
+			this->m_surface = other.m_surface;
+			other.m_surface = VK_NULL_HANDLE;
+			this->m_physical_device = other.m_physical_device;
+			this->m_physical_device_properties = other.m_physical_device_properties;
+			this->m_graphics_queue = other.m_graphics_queue;
+			this->m_graphics_queue_family = other.m_graphics_queue_family;
+			this->m_allocator = other.m_allocator;
+			other.m_allocator = VK_NULL_HANDLE;
+			this->m_swapchain = std::move(other.m_swapchain);
+			return *this;
+		};
+
+		/**
+         * @brief Explicitly destroys all of the resources managed by this instance.
+        */
+		void destroy();
+
 
 		/** @brief Gets the minimum uniform buffer offset alignment, needed for properly aligning data in descriptors
          * @return VkDeviceSize
@@ -310,17 +356,27 @@ namespace ergovk
 			return 0;
 		}
 
+		/**
+         * @brief Handle the Vulkan instance.
+        */
+		VkInstance instance{ VK_NULL_HANDLE };
+
+		/**
+         * @brief Handle to the selected device.
+        */
+		VkDevice device{ VK_NULL_HANDLE };
+
 	private:
-		VulkanInstance(){};
+		VulkanInstance() noexcept {};
 
 		VkDebugUtilsMessengerEXT m_debug_messenger{ VK_NULL_HANDLE };
 		VkSurfaceKHR m_surface{ VK_NULL_HANDLE };
 		VkPhysicalDevice m_physical_device{ VK_NULL_HANDLE };
 		VkPhysicalDeviceProperties m_physical_device_properties{};
 		VkQueue m_graphics_queue{ VK_NULL_HANDLE };
-		VmaAllocator m_allocator{ VK_NULL_HANDLE };
 		std::uint32_t m_graphics_queue_family{ 0 };
-		std::unique_ptr<Swapchain> m_swapchain{ nullptr };
+		VmaAllocator m_allocator{ VK_NULL_HANDLE };
+		Swapchain m_swapchain{};
 	};
 
 	/** @brief Builds a valid ergovk::VulkanInstance based on provided parameters.
@@ -333,12 +389,12 @@ namespace ergovk
 		using CreateSurfaceCallback = std::function<VkSurfaceKHR(VkInstance)>;
 
 		/// @brief Creates a new empty ergovk::VulkanInstanceBuilder
-		VulkanInstanceBuilder();
+		VulkanInstanceBuilder() noexcept;
 		~VulkanInstanceBuilder();
 		VulkanInstanceBuilder(const VulkanInstanceBuilder&) = delete;
-		VulkanInstanceBuilder(VulkanInstanceBuilder&&) = default;
+		VulkanInstanceBuilder(VulkanInstanceBuilder&&) noexcept = default;
 		VulkanInstanceBuilder& operator=(const VulkanInstanceBuilder&) = delete;
-		VulkanInstanceBuilder& operator=(VulkanInstanceBuilder&&) = default;
+		VulkanInstanceBuilder& operator=(VulkanInstanceBuilder&&) noexcept = default;
 
 		/** @brief REQUIRED: Used when the builder needs to create a VkSurfaceKHR for rendering
          * @param callback ergovk::VulkanInstanceBuilder::CreateSurfaceCallback
@@ -362,9 +418,9 @@ namespace ergovk
 		VulkanInstanceBuilder& set_draw_extent(VkExtent2D extent);
 
 		/** @brief Attempts to create an ergovk::VulkanInstance from the parameters stored in this builder
-         * @return Result<std::unique_ptr<ergovk::VulkanInstance>, ergovk::InitializeError>
+         * @return Result<ergovk::VulkanInstance, ergovk::InitializeError>
          */
-		[[nodiscard]] Result<std::unique_ptr<VulkanInstance>, InitializeError> build() const;
+		[[nodiscard]] Result<VulkanInstance, InitializeError> build() const;
 
 	private:
 		vkb::InstanceBuilder* m_builder{ nullptr };
