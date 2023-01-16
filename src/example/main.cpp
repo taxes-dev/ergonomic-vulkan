@@ -40,15 +40,17 @@ int main(int argc, char** argv)
 	// update extents based on window size (may be different from requested)
 	std::int32_t w, h;
 	SDL_GetWindowSizeInPixels(window, &w, &h);
-	VkExtent2D window_extent = { static_cast<std::uint32_t>(w), static_cast<std::uint32_t>(h) };
+	VkExtent2D window_extent{ static_cast<std::uint32_t>(w), static_cast<std::uint32_t>(h) };
 
 	try
 	{
 		// start up a Vulkan instance
 		VulkanInstanceBuilder builder{};
 		builder.set_custom_debug_callback(vk_debug_messenger)
-			.set_create_surface_callback([=](VkInstance instance) -> VkSurfaceKHR {
-				// instance needs a Surface, which SDL can create
+			.set_create_surface_callback([window](VkInstance instance) -> VkSurfaceKHR {
+				// Instance needs a Surface, which SDL can create.
+				// If you're not using a library like SDL, you'll need to create your own surface
+				// using platform-specific calls like vkCreateWin32SurfaceKHR().
 				VkSurfaceKHR surface{ VK_NULL_HANDLE };
 				if (SDL_Vulkan_CreateSurface(window, instance, &surface) == SDL_FALSE)
 				{

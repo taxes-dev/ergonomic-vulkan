@@ -5,6 +5,10 @@ namespace
 {
 	const static std::unordered_map<ergovk::InitializeError, std::string_view> initialize_errors = {
 		{ ergovk::InitializeError::AllocatorCreate, "Unable to create memory allocator" },
+		{ ergovk::InitializeError::CommandBufferCreate, "Unable to allocate a command buffer from the pool" },
+		{ ergovk::InitializeError::CommandPoolCreate, "Unable to create command pool" },
+		{ ergovk::InitializeError::NullCommandPool,
+			"Attempt to create command buffer from an unitialized command pool" },
 		{ ergovk::InitializeError::FailedCreate, "Unable to create instance" },
 		{ ergovk::InitializeError::NoSuitableGpu, "No suitable GPU found" },
 		{ ergovk::InitializeError::SurfaceCreate, "Unable to acquire surface" },

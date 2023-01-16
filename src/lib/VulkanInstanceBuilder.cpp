@@ -128,6 +128,29 @@ namespace ergovk
 			}
 			instance.m_swapchain = unwrap(swapchain_ret);
 
+			// create render frames and command pools
+			instance.m_frames.resize(this->m_render_frames);
+			CommandPoolCreateInfo command_pool_create_info{
+				.device = instance.device,
+				.graphics_queue_family = instance.m_graphics_queue_family,
+				.create_flag_bits = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+			};
+			for (auto & frame : instance.m_frames)
+			{
+				auto command_pool = CommandPool::create(command_pool_create_info);
+				if (is_error(command_pool))
+				{
+					return get_error(command_pool);
+				}
+				frame.command_pool = unwrap(command_pool);
+				auto main_command_buffer = frame.command_pool.create_command_buffer();
+				if (is_error(main_command_buffer))
+				{
+					return get_error(main_command_buffer);
+				}
+				frame.command_buffer = get_value(main_command_buffer);
+			}
+
 			return instance;
 		}
 		return InitializeError::FailedCreate;

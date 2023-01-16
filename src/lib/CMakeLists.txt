@@ -3,6 +3,7 @@ message(FATAL_ERROR "Cannot find VMA headers - did you install as part of Vulkan
 endif()
 
 add_library(ergovk STATIC
+    CommandPool.cpp
     ErrorToString.cpp
     Swapchain.cpp
     VkImageHandle.cpp

@@ -11,6 +11,19 @@ namespace ergovk::structs
 	template <typename T>
 	T create();
 
+	template<>
+	inline VkCommandBufferAllocateInfo create()
+	{
+		return VkCommandBufferAllocateInfo
+		{
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.pNext = VK_NULL_HANDLE,
+			.commandPool = VK_NULL_HANDLE,
+			.commandBufferCount = 1,
+			.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		};
+	};
+
 	template <>
 	inline VkCommandPoolCreateInfo create()
 	{
