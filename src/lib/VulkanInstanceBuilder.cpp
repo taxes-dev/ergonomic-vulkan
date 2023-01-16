@@ -113,11 +113,18 @@ namespace ergovk
 			}
 
 			// create swapchain
-			auto swapchain_ret = Swapchain::create(
-				instance.m_allocator, instance.m_physical_device, instance.device, instance.m_surface, this->m_extent);
+			SwapchainCreateInfo swapchain_create_info{
+				.allocator = instance.m_allocator,
+				.physical_device = instance.m_physical_device,
+				.device = instance.device,
+				.surface = instance.m_surface,
+				.extent = this->m_extent,
+				.create_depth_buffer = this->m_create_depth_buffer,
+			};
+			auto swapchain_ret = Swapchain::create(swapchain_create_info);
 			if (is_error(swapchain_ret))
 			{
-				return InitializeError::SwapchainCreate;
+				return get_error(swapchain_ret);
 			}
 			instance.m_swapchain = unwrap(swapchain_ret);
 
