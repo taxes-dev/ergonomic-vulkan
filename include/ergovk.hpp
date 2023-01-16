@@ -625,6 +625,10 @@ namespace ergovk
 			other.m_allocator = VK_NULL_HANDLE;
 			this->m_swapchain = std::move(other.m_swapchain);
 			this->m_frames = std::move(other.m_frames);
+			this->m_immediate_command_pool = std::move(other.m_immediate_command_pool);
+			this->m_immediate_command_buffer = other.m_immediate_command_buffer;
+			this->m_render_pass = std::move(other.m_render_pass);
+			this->m_sample_count = other.m_sample_count;
 			return *this;
 		};
 
@@ -645,6 +649,12 @@ namespace ergovk
 			}
 			return 0;
 		}
+
+		/**
+		 * @brief Gets the sample count chosen when this instance was created.
+		 * @return VkSampleCountFlagBits
+		*/
+		VkSampleCountFlagBits get_per_pixel_sample_count() const { return this->m_sample_count; }
 
 		/**
 		 * @brief Blocks while waiting for the GPU to be idle.
@@ -682,6 +692,46 @@ namespace ergovk
 		CommandPool m_immediate_command_pool{};
 		VkCommandBuffer m_immediate_command_buffer{ VK_NULL_HANDLE };
 		RenderPass m_render_pass{};
+		VkSampleCountFlagBits m_sample_count{ VK_SAMPLE_COUNT_1_BIT };
+	};
+
+	/**
+	 * @brief Used by ergovk::VulkanInstanceBuilder to determine the right level of multisampling to use.
+	*/
+	enum class DesiredPerPixelSampling : VkFlags
+	{
+		/**
+		 * @brief 1 sample per pixel.
+		*/
+		Sample_1Bit = VK_SAMPLE_COUNT_1_BIT,
+		/**
+		 * @brief 2 samples per pixel.
+		*/
+		Sample_2Bit = VK_SAMPLE_COUNT_2_BIT,
+		/**
+		 * @brief 4 samples per pixel.
+		*/
+		Sample_4Bit = VK_SAMPLE_COUNT_4_BIT,
+		/**
+		 * @brief 8 samples per pixel.
+		*/
+		Sample_8Bit = VK_SAMPLE_COUNT_8_BIT,
+		/**
+		 * @brief 16 samples per pixel.
+		*/
+		Sample_16Bit = VK_SAMPLE_COUNT_16_BIT,
+		/**
+		 * @brief 32 samples per pixel.
+		*/
+		Sample_32Bit = VK_SAMPLE_COUNT_32_BIT,
+		/**
+		 * @brief 64 samples per pixel.
+		*/
+		Sample_64Bit = VK_SAMPLE_COUNT_64_BIT,
+		/**
+		 * @brief The default samples per pixel chosen by ergovk::VulkanInstanceBuilder. Equivalent to \p Sample_16bit.
+		*/
+		Sample_Default = Sample_16Bit,
 	};
 
 	/**
@@ -739,6 +789,20 @@ namespace ergovk
 		VulkanInstanceBuilder& set_draw_extent(VkExtent2D extent);
 
 		/**
+		 * @brief OPTIONAL: Set the desired number of samples per pixel when rendering.
+		 * @param samples ergovk::DesiredPerPixelSampling
+		 * @return this
+		 * @note The default is ergovk::DesiredPerPixelSampling::Sample_Default. When creating the
+		 * instance, this value will be reconciled with the capabilities of the GPU, choosing the 
+		 * highest multisample possible if it is lower than the desired amount.
+		*/
+		VulkanInstanceBuilder& set_per_pixel_sampling(DesiredPerPixelSampling samples)
+		{
+			this->m_samples = samples;
+			return *this;
+		}
+
+		/**
 		 * @brief OPTIONAL: Set the renderer to use only a single frame buffer.
 		 * @return this
 		 * @note The default is to double-buffer.
@@ -789,6 +853,7 @@ namespace ergovk
 		VkExtent2D m_extent{ 1, 1 };
 		bool m_create_depth_buffer{ true };
 		std::size_t m_render_frames{ 2 };
+		DesiredPerPixelSampling m_samples{ DesiredPerPixelSampling::Sample_Default };
 	};
 
 }

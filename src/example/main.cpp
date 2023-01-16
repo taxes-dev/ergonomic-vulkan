@@ -70,6 +70,7 @@ int main(int argc, char** argv)
 
 		std::cout << "GPU minimum buffer alignment of " << instance.get_min_uniform_buffer_offset_alignment()
 				  << " byte(s)" << std::endl;
+		std::cout << "Per pixel samples: " << instance.get_per_pixel_sample_count() << std::endl;
 
 		// loop
 		bool running{ true };

@@ -17,16 +17,18 @@ namespace
 	 * @param device VkDevice
 	 * @param swapchain_image_format VkFormat
 	 * @param depth_buffer_image_format VkFormat (if undefined, the depth buffer will be skipped)
+	 * @param sample_count VkSampleCountFlagBits
 	*/
 	Result<RenderPass, InitializeError> create_render_pass(
-		VkDevice device, VkFormat swapchain_image_format, VkFormat depth_buffer_image_format)
+		VkDevice device, VkFormat swapchain_image_format, VkFormat depth_buffer_image_format,
+		VkSampleCountFlagBits sample_count)
 	{
 
 		RenderPassCreateInfo create_info{ device };
 		VkAttachmentDescription color_attachment{};
 		color_attachment.format = swapchain_image_format;
 		// 1 sample, no MSAA
-		color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		color_attachment.samples = sample_count;
 		// clear when attachment is loaded
 		color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		// store when renderpass ends
@@ -51,7 +53,7 @@ namespace
 		VkAttachmentDescription depth_attachment{};
 		depth_attachment.flags = 0;
 		depth_attachment.format = depth_buffer_image_format;
-		depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		depth_attachment.samples = sample_count;
 		depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -108,6 +110,38 @@ namespace
 		}
 
 		return RenderPass::create(create_info);
+	}
+
+	VkSampleCountFlagBits get_desired_sample_count(
+		const VkPhysicalDeviceProperties& props, DesiredPerPixelSampling desired_count)
+	{
+		VkSampleCountFlags counts =
+			props.limits.framebufferColorSampleCounts & props.limits.framebufferDepthSampleCounts;
+		if ((counts & VK_SAMPLE_COUNT_64_BIT) && desired_count >= DesiredPerPixelSampling::Sample_64Bit)
+		{
+			return VK_SAMPLE_COUNT_64_BIT;
+		}
+		if ((counts & VK_SAMPLE_COUNT_32_BIT) && desired_count >= DesiredPerPixelSampling::Sample_32Bit)
+		{
+			return VK_SAMPLE_COUNT_32_BIT;
+		}
+		if ((counts & VK_SAMPLE_COUNT_16_BIT) && desired_count >= DesiredPerPixelSampling::Sample_16Bit)
+		{
+			return VK_SAMPLE_COUNT_16_BIT;
+		}
+		if ((counts & VK_SAMPLE_COUNT_8_BIT) && desired_count >= DesiredPerPixelSampling::Sample_8Bit)
+		{
+			return VK_SAMPLE_COUNT_8_BIT;
+		}
+		if ((counts & VK_SAMPLE_COUNT_4_BIT) && desired_count >= DesiredPerPixelSampling::Sample_4Bit)
+		{
+			return VK_SAMPLE_COUNT_4_BIT;
+		}
+		if ((counts & VK_SAMPLE_COUNT_2_BIT) && desired_count >= DesiredPerPixelSampling::Sample_2Bit)
+		{
+			return VK_SAMPLE_COUNT_2_BIT;
+		}
+		return VK_SAMPLE_COUNT_1_BIT;
 	}
 }
 
@@ -211,6 +245,9 @@ namespace ergovk
 				return InitializeError::NoSuitableGpu;
 			}
 
+			// setup sampler count
+			instance.m_sample_count = get_desired_sample_count(instance.m_physical_device_properties, this->m_samples);
+
 			// initialize memory alloactor
 			VmaAllocatorCreateInfo allocator_info{};
 			allocator_info.physicalDevice = instance.m_physical_device;
@@ -264,7 +301,7 @@ namespace ergovk
 
 			// create the default render pass
 			auto render_pass = create_render_pass(instance.device, instance.m_swapchain.get_image_format(),
-				instance.m_swapchain.get_depth_buffer_image_format());
+				instance.m_swapchain.get_depth_buffer_image_format(), instance.m_sample_count);
 			RETURN_IF_ERROR(render_pass);
 			instance.m_render_pass = unwrap(render_pass);
 
