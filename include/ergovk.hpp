@@ -540,6 +540,8 @@ namespace ergovk
 		VmaAllocator m_allocator{ VK_NULL_HANDLE };
 		Swapchain m_swapchain{};
 		std::vector<RenderFrame> m_frames{};
+		CommandPool m_immediate_command_pool{};
+		VkCommandBuffer m_immediate_command_buffer{VK_NULL_HANDLE};
 	};
 
 	/**

@@ -9,6 +9,7 @@ namespace ergovk
 		{
 			vkDeviceWaitIdle(this->device);
 		}
+		this->m_immediate_command_pool.destroy();
 		this->m_frames.clear();
 		this->m_swapchain.destroy();
 		if (this->m_allocator)

@@ -1,6 +1,13 @@
 #include "ergovk.hpp"
 #include "VkBootstrap.h"
 
+// common pattern in build() function below
+#define RETURN_IF_ERROR(x)                                                                                             \
+	if (is_error(x))                                                                                                   \
+	{                                                                                                                  \
+		return get_error(x);                                                                                           \
+	}
+
 namespace ergovk
 {
 	VulkanInstanceBuilder::VulkanInstanceBuilder() noexcept
@@ -122,10 +129,7 @@ namespace ergovk
 				.create_depth_buffer = this->m_create_depth_buffer,
 			};
 			auto swapchain_ret = Swapchain::create(swapchain_create_info);
-			if (is_error(swapchain_ret))
-			{
-				return get_error(swapchain_ret);
-			}
+			RETURN_IF_ERROR(swapchain_ret);
 			instance.m_swapchain = unwrap(swapchain_ret);
 
 			// create render frames and command pools
@@ -135,21 +139,25 @@ namespace ergovk
 				.graphics_queue_family = instance.m_graphics_queue_family,
 				.create_flag_bits = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
 			};
-			for (auto & frame : instance.m_frames)
+			for (auto& frame : instance.m_frames)
 			{
 				auto command_pool = CommandPool::create(command_pool_create_info);
-				if (is_error(command_pool))
-				{
-					return get_error(command_pool);
-				}
+				RETURN_IF_ERROR(command_pool);
 				frame.command_pool = unwrap(command_pool);
 				auto main_command_buffer = frame.command_pool.create_command_buffer();
-				if (is_error(main_command_buffer))
-				{
-					return get_error(main_command_buffer);
-				}
+				RETURN_IF_ERROR(main_command_buffer);
 				frame.command_buffer = get_value(main_command_buffer);
 			}
+
+			// create a separate command pool for "immediate" executed commands
+			// this is useful for uploading textures/meshes to the GPU
+			command_pool_create_info.create_flag_bits = static_cast<VkCommandPoolCreateFlagBits>(0);
+			auto command_pool = CommandPool::create(command_pool_create_info);
+			RETURN_IF_ERROR(command_pool);
+			instance.m_immediate_command_pool = unwrap(command_pool);
+			auto immed_command_buffer = instance.m_immediate_command_pool.create_command_buffer();
+			RETURN_IF_ERROR(immed_command_buffer);
+			instance.m_immediate_command_buffer = get_value(immed_command_buffer);
 
 			return instance;
 		}
