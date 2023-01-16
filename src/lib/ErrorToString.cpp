@@ -14,6 +14,7 @@ namespace
 		{ ergovk::InitializeError::SurfaceCreate, "Unable to acquire surface" },
 		{ ergovk::InitializeError::DepthImageAllocation, "Unable to allocate depth buffer image" },
 		{ ergovk::InitializeError::DepthImageViewAllocation, "Unable to allocate depth image view allocation" },
+		{ ergovk::InitializeError::RenderPassCreate, "Unable to create render pass" },
 		{ ergovk::InitializeError::SwapchainCreate, "Unable to create swapchain" },
 	};
 }

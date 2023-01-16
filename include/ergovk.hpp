@@ -71,6 +71,11 @@ namespace ergovk
 		 */
 		DepthImageViewAllocation,
 		/**
+		 * @brief Could not create a VkRenderPass.
+		 * @see ergovk::RenderPass::create()
+		*/
+		RenderPassCreate,
+		/**
 		 * @brief Initial creation of VkSwapchainKHR failed.
 		 * @see ergovk::Swapchain::create()
 		 */
@@ -364,6 +369,18 @@ namespace ergovk
 		*/
 		bool has_depth_buffer() const { return this->m_depth_image.image != VK_NULL_HANDLE; };
 
+		/**
+		 * @brief Get the image format of the swapchain.
+		 * @return VkFormat
+		*/
+		VkFormat get_image_format() const { return this->m_image_format; };
+
+		/**
+		 * @brief Get the image format of the depth buffer.
+		 * @return VkFormat (will be \p VK_FORMAT_UNDEFINED if there is no depth buffer)
+		*/
+		VkFormat get_depth_buffer_image_format() const { return this->m_depth_format; };
+
 	private:
 		VkDevice m_device{ VK_NULL_HANDLE };
 		VkSwapchainKHR m_swapchain{ VK_NULL_HANDLE };
@@ -404,19 +421,19 @@ namespace ergovk
 		/**
 		 * @brief Creates a new, empty ergovk::CommandPool.
 		*/
-		CommandPool(){};
+		CommandPool() noexcept {};
 		/**
 		 * @brief Creates a new ergovk::CommandPool.
 		 * @param device VkDevice
 		 * @param command_pool VkCommandPool
 		*/
-		CommandPool(VkDevice device, VkCommandPool command_pool)
+		CommandPool(VkDevice device, VkCommandPool command_pool) noexcept
 			: m_device{ device }, m_command_pool{ command_pool } {};
 		~CommandPool() { this->destroy(); };
 		CommandPool(const CommandPool&) = delete;
-		CommandPool(CommandPool&& other) { *this = std::move(other); };
+		CommandPool(CommandPool&& other) noexcept { *this = std::move(other); };
 		CommandPool& operator=(const CommandPool&) = delete;
-		CommandPool& operator=(CommandPool&& other)
+		CommandPool& operator=(CommandPool&& other) noexcept
 		{
 			this->m_command_pool = other.m_command_pool;
 			other.m_command_pool = VK_NULL_HANDLE;
@@ -463,6 +480,117 @@ namespace ergovk
 		 * @brief The frame's primary command buffer.
 		*/
 		VkCommandBuffer command_buffer{};
+	};
+
+	/**
+	 * @brief Parameters for the call to ergovk::RenderPass::create().
+	*/
+	class RenderPassCreateInfo
+	{
+		friend class RenderPass;
+
+	public:
+		/**
+		 * @brief Creates a new ergovk::RenderPassCreateInfo.
+		 * @param device VkDevice
+		 * @param create_flag_bits VkRenderPassCreateFlagBits
+		*/
+		RenderPassCreateInfo(VkDevice device,
+			VkRenderPassCreateFlagBits create_flag_bits = static_cast<VkRenderPassCreateFlagBits>(0)) noexcept
+			: m_device{ device }, m_create_flag_bits{ create_flag_bits } {};
+		RenderPassCreateInfo(const RenderPassCreateInfo&) = default;
+		RenderPassCreateInfo(RenderPassCreateInfo&&) = default;
+		RenderPassCreateInfo& operator=(const RenderPassCreateInfo&) = default;
+		RenderPassCreateInfo& operator=(RenderPassCreateInfo&&) = default;
+
+		/**
+		 * @brief Adds an attachment description to the render pass.
+		 * @param attachment_description VkAttachmentDescription
+		*/
+		void add_attachment_description(VkAttachmentDescription attachment_description)
+		{
+			this->m_attachment_descriptions.push_back(attachment_description);
+		}
+
+		/**
+		 * @brief Adds a subpass dependency to the render pass.
+		 * @param subpass_dependency VkSubpassDependency
+		*/
+		void add_subpass_dependency(VkSubpassDependency subpass_dependency)
+		{
+			this->m_subpass_dependencies.push_back(subpass_dependency);
+		}
+
+		/**
+		 * @brief Adds a subpass description to the render pass.
+		 * @param subpass_description VkSubpassDescription
+		*/
+		void add_subpass_description(VkSubpassDescription subpass_description)
+		{
+			this->m_subpass_descriptions.push_back(subpass_description);
+		}
+
+		/**
+		 * @brief Gets a VkRenderPassCreateInfo value that represents this ergovk::RenderPassCreateInfo's state.
+		 * @return VkRenderPassCreateInfo
+		 * @note The returned structure contains pointers to objects owned by this ergovk::RenderPassCreateInfo.
+		 * Be careful not to use it beyond the lifetime of this object.
+		*/
+		const VkRenderPassCreateInfo& value();
+
+	private:
+		VkDevice m_device{ VK_NULL_HANDLE };
+		VkRenderPassCreateInfo m_create_info{ structs::create<VkRenderPassCreateInfo>() };
+		VkRenderPassCreateFlagBits m_create_flag_bits{};
+		std::vector<VkAttachmentDescription> m_attachment_descriptions{};
+		std::vector<VkSubpassDependency> m_subpass_dependencies{};
+		std::vector<VkSubpassDescription> m_subpass_descriptions{};
+	};
+
+	/**
+	 * A render pass, which describes to Vulkan how to perform rendering of images to the swapchain.
+	*/
+	class RenderPass
+	{
+	public:
+		/**
+		 * @brief Creates a new, empty ergovk::RenderPass.
+		*/
+		RenderPass() noexcept {};
+		/**
+		 * @brief Creates a new ergovk::RenderPass.
+		 * @param device VkDevice
+		 * @param render_pass VkRenderPass
+		*/
+		RenderPass(VkDevice device, VkRenderPass render_pass) noexcept
+			: m_device{ device }, m_render_pass{ render_pass } {};
+		~RenderPass() { this->destroy(); };
+		RenderPass(const RenderPass&) = delete;
+		RenderPass(RenderPass&& other) noexcept { *this = std::move(other); }
+		RenderPass& operator=(const RenderPass&) = delete;
+		RenderPass& operator=(RenderPass&& other) noexcept
+		{
+			this->m_device = other.m_device;
+			this->m_render_pass = other.m_render_pass;
+			other.m_render_pass = VK_NULL_HANDLE;
+			return *this;
+		}
+
+		/**
+         * @brief Allocates a new render pass.
+		 * @param create_info ergovk::RenderPassCreateInfo
+         * @return ergovk::CommandPool on success, otherwise ergovk::InitializeError
+        */
+		static Result<RenderPass, InitializeError> create(RenderPassCreateInfo& create_info);
+
+		/**
+         * @brief Explicitly destroys all of the resources managed by this instance.
+        */
+		void destroy();
+
+	private:
+		VkDevice m_device{ VK_NULL_HANDLE };
+		VkRenderPass m_render_pass{ VK_NULL_HANDLE };
 	};
 
 	/**
@@ -519,6 +647,17 @@ namespace ergovk
 		}
 
 		/**
+		 * @brief Blocks while waiting for the GPU to be idle.
+		*/
+		void wait_for_idle() const
+		{
+			if (this->device)
+			{
+				vkDeviceWaitIdle(this->device);
+			}
+		}
+
+		/**
          * @brief Handle to the Vulkan instance.
         */
 		VkInstance instance{ VK_NULL_HANDLE };
@@ -541,7 +680,8 @@ namespace ergovk
 		Swapchain m_swapchain{};
 		std::vector<RenderFrame> m_frames{};
 		CommandPool m_immediate_command_pool{};
-		VkCommandBuffer m_immediate_command_buffer{VK_NULL_HANDLE};
+		VkCommandBuffer m_immediate_command_buffer{ VK_NULL_HANDLE };
+		RenderPass m_render_pass{};
 	};
 
 	/**

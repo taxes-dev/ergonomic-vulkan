@@ -5,10 +5,8 @@ namespace ergovk
 {
 	void VulkanInstance::destroy()
 	{
-		if (this->device)
-		{
-			vkDeviceWaitIdle(this->device);
-		}
+		this->wait_for_idle();
+		this->m_render_pass.destroy();
 		this->m_immediate_command_pool.destroy();
 		this->m_frames.clear();
 		this->m_swapchain.destroy();

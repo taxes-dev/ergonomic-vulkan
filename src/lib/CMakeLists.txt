@@ -5,6 +5,8 @@ endif()
 add_library(ergovk STATIC
     CommandPool.cpp
     ErrorToString.cpp
+    RenderPass.cpp
+    RenderPassCreateInfo.cpp
     Swapchain.cpp
     VkImageHandle.cpp
     VkImageViewHandle.cpp
