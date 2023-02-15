@@ -1,13 +1,14 @@
 #pragma once
 #include <concepts>
 #include <functional>
-#include <string_view>
+#include <memory>
 #include <variant>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <vma/vk_mem_alloc.h>
 
 #include "ergovk_structs.hpp"
+#include "ergovk_resources.hpp"
 
 #ifndef NDEBUG
 #define ERGOVK_DEBUG
@@ -167,6 +168,9 @@ namespace ergovk
 		return std::get<TOk>(std::move(result));
 	}
 
+	class VulkanInstance;
+	using ResourceID = resources::ResourceID;
+
 	/**
      * @brief Contains a reference to an image buffer allocated by VMA.
     */
@@ -298,21 +302,9 @@ namespace ergovk
 	struct SwapchainCreateInfo
 	{
 		/**
-		 * @brief VmaAllocator to use for creating images.
+		 * @brief The ID of the resource to create. This will be used to reference it later.
 		*/
-		VmaAllocator allocator{ VK_NULL_HANDLE };
-		/**
-		 * @brief Phyiscal Vulkan device.
-		*/
-		VkPhysicalDevice physical_device{ VK_NULL_HANDLE };
-		/**
-		 * @brief Logical Vulkan device.
-		 */
-		VkDevice device{ VK_NULL_HANDLE };
-		/**
-		 * @brief Surface that will be used for rendering.
-		*/
-		VkSurfaceKHR surface{ VK_NULL_HANDLE };
+		ResourceID resource_id{};
 		/**
 		 * @brief Extents of \p surface in pixels.
 		*/
@@ -333,7 +325,7 @@ namespace ergovk
          * @brief Creates a new, empty ergovk::Swapchain.
         */
 		Swapchain() noexcept {};
-		~Swapchain() { this->destroy(); };
+		~Swapchain();
 		Swapchain(const Swapchain&) = delete;
 		Swapchain(Swapchain&& other) noexcept { *this = std::move(other); };
 		Swapchain& operator=(const Swapchain&) = delete;
@@ -353,15 +345,12 @@ namespace ergovk
 
 		/**
          * @brief Allocates a new swapchain with images and views, as well as a depth buffer if requested.
+		 * @param instance ergovk::VulkanInstance
 		 * @param create_info ergovk::SwapchainCreateInfo
-         * @return ergovk::Swapchain on success, otherwise ergovk::InitializeError
+         * @return std::shared_ptr<ergovk::Swapchain> on success, otherwise ergovk::InitializeError
         */
-		static Result<Swapchain, InitializeError> create(SwapchainCreateInfo create_info);
-
-		/**
-         * @brief Explicitly destroys all of the resources managed by this instance.
-        */
-		void destroy();
+		static Result<std::shared_ptr<Swapchain>, InitializeError> create(
+			VulkanInstance& instance, SwapchainCreateInfo create_info);
 
 		/**
 		 * @brief Returns a value indicating if this ergovk::Swapchain has a depth buffer.
@@ -615,15 +604,15 @@ namespace ergovk
 			other.device = VK_NULL_HANDLE;
 			this->m_debug_messenger = other.m_debug_messenger;
 			other.m_debug_messenger = VK_NULL_HANDLE;
-			this->m_surface = other.m_surface;
-			other.m_surface = VK_NULL_HANDLE;
-			this->m_physical_device = other.m_physical_device;
+			this->surface = other.surface;
+			other.surface = VK_NULL_HANDLE;
+			this->physical_device = other.physical_device;
 			this->m_physical_device_properties = other.m_physical_device_properties;
 			this->m_graphics_queue = other.m_graphics_queue;
 			this->m_graphics_queue_family = other.m_graphics_queue_family;
-			this->m_allocator = other.m_allocator;
-			other.m_allocator = VK_NULL_HANDLE;
-			this->m_swapchain = std::move(other.m_swapchain);
+			this->allocator = other.allocator;
+			other.allocator = VK_NULL_HANDLE;
+			this->swapchains = std::move(other.swapchains);
 			this->m_frames = std::move(other.m_frames);
 			this->m_immediate_command_pool = std::move(other.m_immediate_command_pool);
 			this->m_immediate_command_buffer = other.m_immediate_command_buffer;
@@ -643,7 +632,7 @@ namespace ergovk
          */
 		VkDeviceSize get_min_uniform_buffer_offset_alignment() const
 		{
-			if (this->m_physical_device)
+			if (this->physical_device)
 			{
 				return this->m_physical_device_properties.limits.minUniformBufferOffsetAlignment;
 			}
@@ -677,17 +666,33 @@ namespace ergovk
         */
 		VkDevice device{ VK_NULL_HANDLE };
 
+		/**
+		 * @brief Handle to the current render surface.
+		*/
+		VkSurfaceKHR surface{ VK_NULL_HANDLE };
+
+		/**
+		 * @brief Handle the selected physical device.
+		*/
+		VkPhysicalDevice physical_device{ VK_NULL_HANDLE };
+
+		/**
+		 * @brief Handle to the VMA allocator.
+		*/
+		VmaAllocator allocator{ VK_NULL_HANDLE };
+
+		/**
+		 * @brief Set of managed ergovk::Swapchain resources.
+		*/
+		resources::ResourceSet<Swapchain> swapchains{};
+
 	private:
 		VulkanInstance() noexcept {};
 
 		VkDebugUtilsMessengerEXT m_debug_messenger{ VK_NULL_HANDLE };
-		VkSurfaceKHR m_surface{ VK_NULL_HANDLE };
-		VkPhysicalDevice m_physical_device{ VK_NULL_HANDLE };
 		VkPhysicalDeviceProperties m_physical_device_properties{};
 		VkQueue m_graphics_queue{ VK_NULL_HANDLE };
 		std::uint32_t m_graphics_queue_family{ 0 };
-		VmaAllocator m_allocator{ VK_NULL_HANDLE };
-		Swapchain m_swapchain{};
 		std::vector<RenderFrame> m_frames{};
 		CommandPool m_immediate_command_pool{};
 		VkCommandBuffer m_immediate_command_buffer{ VK_NULL_HANDLE };
@@ -856,4 +861,11 @@ namespace ergovk
 		DesiredPerPixelSampling m_samples{ DesiredPerPixelSampling::Sample_Default };
 	};
 
+	namespace defaults
+	{
+		/**
+		 * @brief The default ergovk::Swapchain created by ergovk::VulkanInstanceBuilder.
+		*/
+		inline constexpr const char* RESID_SWAPCHAIN = "_ergovk_default_swapchain";
+	}
 }

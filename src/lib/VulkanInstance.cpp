@@ -9,21 +9,22 @@ namespace ergovk
 		this->m_render_pass.destroy();
 		this->m_immediate_command_pool.destroy();
 		this->m_frames.clear();
-		this->m_swapchain.destroy();
-		if (this->m_allocator)
+		//this->m_swapchain.destroy();
+		this->swapchains.reset();
+		if (this->allocator)
 		{
-			vmaDestroyAllocator(this->m_allocator);
-			this->m_allocator = VK_NULL_HANDLE;
+			vmaDestroyAllocator(this->allocator);
+			this->allocator = VK_NULL_HANDLE;
 		}
 		if (this->device)
 		{
 			vkDestroyDevice(this->device, nullptr);
 			this->device = VK_NULL_HANDLE;
 		}
-		if (this->m_surface)
+		if (this->surface)
 		{
-			vkDestroySurfaceKHR(this->instance, this->m_surface, nullptr);
-			this->m_surface = VK_NULL_HANDLE;
+			vkDestroySurfaceKHR(this->instance, this->surface, nullptr);
+			this->surface = VK_NULL_HANDLE;
 		}
 		if (this->m_debug_messenger)
 		{

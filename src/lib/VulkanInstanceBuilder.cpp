@@ -197,8 +197,8 @@ namespace ergovk
 			instance.instance = build_ret->instance;
 
 			// create surface
-			instance.m_surface = this->m_create_surface_callback(instance.instance);
-			if (instance.m_surface == VK_NULL_HANDLE)
+			instance.surface = this->m_create_surface_callback(instance.instance);
+			if (instance.surface == VK_NULL_HANDLE)
 			{
 				return InitializeError::SurfaceCreate;
 			}
@@ -208,7 +208,7 @@ namespace ergovk
 			vkb::PhysicalDeviceSelector selector{ *build_ret };
 			auto selector_ret = selector							 //
 									.set_minimum_version(1, 1)		 //
-									.set_surface(instance.m_surface) //
+									.set_surface(instance.surface) //
 									.select();
 			if (!selector_ret)
 			{
@@ -223,7 +223,7 @@ namespace ergovk
 			if (device_ret)
 			{
 				instance.device = device_ret->device;
-				instance.m_physical_device = selector_ret->physical_device;
+				instance.physical_device = selector_ret->physical_device;
 
 				// get gpu properties
 				instance.m_physical_device_properties = device_ret->physical_device.properties;
@@ -250,27 +250,23 @@ namespace ergovk
 
 			// initialize memory alloactor
 			VmaAllocatorCreateInfo allocator_info{};
-			allocator_info.physicalDevice = instance.m_physical_device;
+			allocator_info.physicalDevice = instance.physical_device;
 			allocator_info.device = instance.device;
 			allocator_info.instance = instance.instance;
 
-			if (vmaCreateAllocator(&allocator_info, &instance.m_allocator) != VK_SUCCESS)
+			if (vmaCreateAllocator(&allocator_info, &instance.allocator) != VK_SUCCESS)
 			{
 				return InitializeError::AllocatorCreate;
 			}
 
 			// create swapchain
 			SwapchainCreateInfo swapchain_create_info{
-				.allocator = instance.m_allocator,
-				.physical_device = instance.m_physical_device,
-				.device = instance.device,
-				.surface = instance.m_surface,
 				.extent = this->m_extent,
 				.create_depth_buffer = this->m_create_depth_buffer,
+				.resource_id = defaults::RESID_SWAPCHAIN,
 			};
-			auto swapchain_ret = Swapchain::create(swapchain_create_info);
+			auto swapchain_ret = Swapchain::create(instance, swapchain_create_info);
 			RETURN_IF_ERROR(swapchain_ret);
-			instance.m_swapchain = unwrap(swapchain_ret);
 
 			// create render frames and command pools
 			instance.m_frames.resize(this->m_render_frames);
@@ -300,8 +296,8 @@ namespace ergovk
 			instance.m_immediate_command_buffer = get_value(immed_command_buffer);
 
 			// create the default render pass
-			auto render_pass = create_render_pass(instance.device, instance.m_swapchain.get_image_format(),
-				instance.m_swapchain.get_depth_buffer_image_format(), instance.m_sample_count);
+			auto render_pass = create_render_pass(instance.device, get_value(swapchain_ret)->get_image_format(),
+				get_value(swapchain_ret)->get_depth_buffer_image_format(), instance.m_sample_count);
 			RETURN_IF_ERROR(render_pass);
 			instance.m_render_pass = unwrap(render_pass);
 

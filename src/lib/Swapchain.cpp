@@ -3,7 +3,7 @@
 
 namespace ergovk
 {
-	void Swapchain::destroy()
+	 Swapchain::~Swapchain()
 	{
 		if (this->m_swapchain)
 		{
@@ -15,36 +15,37 @@ namespace ergovk
 		}
 	}
 
-	Result<Swapchain, InitializeError> Swapchain::create(SwapchainCreateInfo create_info)
+	Result<std::shared_ptr<Swapchain>, InitializeError> Swapchain::create(
+		VulkanInstance& instance, SwapchainCreateInfo create_info)
 	{
 		// checks
-		assert(create_info.allocator != VK_NULL_HANDLE);
-		assert(create_info.device != VK_NULL_HANDLE);
-		assert(create_info.physical_device != VK_NULL_HANDLE);
-		assert(create_info.surface != VK_NULL_HANDLE);
+		assert(instance.allocator != VK_NULL_HANDLE);
+		assert(instance.device != VK_NULL_HANDLE);
+		assert(instance.physical_device != VK_NULL_HANDLE);
+		assert(instance.surface != VK_NULL_HANDLE);
 		assert(create_info.extent.height > 0);
 		assert(create_info.extent.width > 0);
 
 		// build the swapchain
-		vkb::SwapchainBuilder swapchain_builder{ create_info.physical_device, create_info.device, create_info.surface };
+		vkb::SwapchainBuilder swapchain_builder{ instance.physical_device, instance.device, instance.surface };
 		auto builder_ret = swapchain_builder.use_default_format_selection()
 							   .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
 							   .set_desired_extent(create_info.extent.width, create_info.extent.height)
 							   .build();
-		Swapchain swapchain{};
+		auto swapchain = std::make_shared<Swapchain>();
 		if (builder_ret)
 		{
 			vkb::Swapchain vswapchain = builder_ret.value();
-			swapchain.m_device = create_info.device;
-			swapchain.m_swapchain = vswapchain.swapchain;
-			swapchain.m_images = vswapchain.get_images().value();
+			swapchain->m_device = instance.device;
+			swapchain->m_swapchain = vswapchain.swapchain;
+			swapchain->m_images = vswapchain.get_images().value();
 			// value() is creating the views on the fly, thus why we can't use it as an rvalue in the loop
 			auto views = vswapchain.get_image_views().value();
 			for (auto& image_view : views)
 			{
-				swapchain.m_image_views.emplace_back(create_info.device, image_view);
+				swapchain->m_image_views.emplace_back(instance.device, image_view);
 			}
-			swapchain.m_image_format = vswapchain.image_format;
+			swapchain->m_image_format = vswapchain.image_format;
 		}
 		else
 		{
@@ -54,9 +55,9 @@ namespace ergovk
 		if (create_info.create_depth_buffer)
 		{
 			// depth buffer
-			swapchain.m_depth_format = VkFormat::VK_FORMAT_D32_SFLOAT;
+			swapchain->m_depth_format = VkFormat::VK_FORMAT_D32_SFLOAT;
 			auto depth_image_info = structs::create<VkImageCreateInfo>();
-			depth_image_info.format = swapchain.m_depth_format;
+			depth_image_info.format = swapchain->m_depth_format;
 			depth_image_info.extent = VkExtent3D{ create_info.extent.width, create_info.extent.height, 1 };
 			depth_image_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
@@ -66,27 +67,29 @@ namespace ergovk
 			dimg_allocinfo.requiredFlags = VkMemoryPropertyFlags{ VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT };
 
 			auto depth_img_ret =
-				VkImageHandle::create(create_info.allocator, create_info.device, depth_image_info, dimg_allocinfo);
+				VkImageHandle::create(instance.allocator, instance.device, depth_image_info, dimg_allocinfo);
 			if (is_error(depth_img_ret))
 			{
 				return InitializeError::DepthImageAllocation;
 			}
-			swapchain.m_depth_image = unwrap(depth_img_ret);
+			swapchain->m_depth_image = unwrap(depth_img_ret);
 
 			// build an image view for rendering
 			auto depth_imageview_info = structs::create<VkImageViewCreateInfo>();
-			depth_imageview_info.format = swapchain.m_depth_format;
-			depth_imageview_info.image = swapchain.m_depth_image.image;
+			depth_imageview_info.format = swapchain->m_depth_format;
+			depth_imageview_info.image = swapchain->m_depth_image.image;
 			depth_imageview_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-			auto depth_imageview_ret = VkImageViewHandle::create(create_info.device, depth_imageview_info);
+			auto depth_imageview_ret = VkImageViewHandle::create(instance.device, depth_imageview_info);
 			if (is_error(depth_imageview_ret))
 			{
 				return InitializeError::DepthImageViewAllocation;
 			}
-			swapchain.m_depth_image_view = unwrap(depth_imageview_ret);
+			swapchain->m_depth_image_view = unwrap(depth_imageview_ret);
 		}
-		return swapchain;
+
+		 instance.swapchains.insert(create_info.resource_id, swapchain);
+		 return swapchain;
 	}
 
 }
