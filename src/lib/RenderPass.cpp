@@ -2,7 +2,7 @@
 
 namespace ergovk
 {
-	void RenderPass::destroy()
+	RenderPass::~RenderPass()
 	{
 		if (this->m_render_pass)
 		{
@@ -11,16 +11,18 @@ namespace ergovk
 		}
 	}
 
-	Result<RenderPass, InitializeError> RenderPass::create(RenderPassCreateInfo& create_info)
+	Result<std::shared_ptr<RenderPass>, InitializeError> RenderPass::create(VulkanInstance & instance, ResourceID resource_id, RenderPassCreateInfo& create_info)
 	{
 		auto render_pass_create_info = create_info.value();
-		VkRenderPass render_pass;
-		VkResult result = vkCreateRenderPass(create_info.m_device, &render_pass_create_info, nullptr, &render_pass);
+		VkRenderPass vk_render_pass;
+		VkResult result = vkCreateRenderPass(instance.device, &render_pass_create_info, nullptr, &vk_render_pass);
 		if (result != VK_SUCCESS)
 		{
 			return InitializeError::RenderPassCreate;
 		}
-		return RenderPass{ create_info.m_device, render_pass };
+		auto render_pass = std::make_shared<RenderPass>( instance.device, vk_render_pass );
+		instance.resources<RenderPass>().insert(resource_id, render_pass);
+		return render_pass;
 	}
 
 }

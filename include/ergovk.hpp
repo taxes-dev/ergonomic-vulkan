@@ -391,9 +391,9 @@ namespace ergovk
 	struct CommandPoolCreateInfo
 	{
 		/**
-		 * @brief Logical Vulkan device handle.
+		 * @brief The ID of the resource to create. This will be used to reference it later.
 		*/
-		VkDevice device{ VK_NULL_HANDLE };
+		ResourceID resource_id{};
 		/**
 		 * @brief Creation flags bits for the command pool.
 		*/
@@ -421,7 +421,7 @@ namespace ergovk
 		*/
 		CommandPool(VkDevice device, VkCommandPool command_pool) noexcept
 			: m_device{ device }, m_command_pool{ command_pool } {};
-		~CommandPool() { this->destroy(); };
+		~CommandPool();
 		CommandPool(const CommandPool&) = delete;
 		CommandPool(CommandPool&& other) noexcept { *this = std::move(other); };
 		CommandPool& operator=(const CommandPool&) = delete;
@@ -435,15 +435,12 @@ namespace ergovk
 
 		/**
          * @brief Allocates a new command pool.
+		 * @param instance ergovk::VulkanInstance
 		 * @param create_info ergovk::CommandPoolCreateInfo
-         * @return ergovk::CommandPool on success, otherwise ergovk::InitializeError
+         * @return std::shared_ptr<ergovk::CommandPool> on success, otherwise ergovk::InitializeError
         */
-		static Result<CommandPool, InitializeError> create(CommandPoolCreateInfo create_info);
-
-		/**
-         * @brief Explicitly destroys all of the resources managed by this instance.
-        */
-		void destroy();
+		static Result<std::shared_ptr<CommandPool>, InitializeError> create(
+			VulkanInstance& instance, CommandPoolCreateInfo create_info);
 
 		/**
 		 * @brief Allocate a command buffer from this command pool.
@@ -467,7 +464,7 @@ namespace ergovk
 		/**
 		 * @brief The frame's ergovk::CommandPool.
 		*/
-		CommandPool command_pool{};
+		std::shared_ptr<CommandPool> command_pool{};
 		/**
 		 * @brief The frame's primary command buffer.
 		*/
@@ -487,9 +484,9 @@ namespace ergovk
 		 * @param device VkDevice
 		 * @param create_flag_bits VkRenderPassCreateFlagBits
 		*/
-		RenderPassCreateInfo(VkDevice device,
+		RenderPassCreateInfo(
 			VkRenderPassCreateFlagBits create_flag_bits = static_cast<VkRenderPassCreateFlagBits>(0)) noexcept
-			: m_device{ device }, m_create_flag_bits{ create_flag_bits } {};
+			: m_create_flag_bits{ create_flag_bits } {};
 		RenderPassCreateInfo(const RenderPassCreateInfo&) = default;
 		RenderPassCreateInfo(RenderPassCreateInfo&&) = default;
 		RenderPassCreateInfo& operator=(const RenderPassCreateInfo&) = default;
@@ -531,7 +528,6 @@ namespace ergovk
 		const VkRenderPassCreateInfo& value();
 
 	private:
-		VkDevice m_device{ VK_NULL_HANDLE };
 		VkRenderPassCreateInfo m_create_info{ structs::create<VkRenderPassCreateInfo>() };
 		VkRenderPassCreateFlagBits m_create_flag_bits{};
 		std::vector<VkAttachmentDescription> m_attachment_descriptions{};
@@ -556,7 +552,7 @@ namespace ergovk
 		*/
 		RenderPass(VkDevice device, VkRenderPass render_pass) noexcept
 			: m_device{ device }, m_render_pass{ render_pass } {};
-		~RenderPass() { this->destroy(); };
+		~RenderPass();
 		RenderPass(const RenderPass&) = delete;
 		RenderPass(RenderPass&& other) noexcept { *this = std::move(other); }
 		RenderPass& operator=(const RenderPass&) = delete;
@@ -570,15 +566,13 @@ namespace ergovk
 
 		/**
          * @brief Allocates a new render pass.
+		 * @param instance ergovk::VulkanInstance
+		 * @param resource_id ergovk::resources::ResourceID
 		 * @param create_info ergovk::RenderPassCreateInfo
-         * @return ergovk::CommandPool on success, otherwise ergovk::InitializeError
+         * @return std::shared_ptr<ergovk::RenderPass> on success, otherwise ergovk::InitializeError
         */
-		static Result<RenderPass, InitializeError> create(RenderPassCreateInfo& create_info);
-
-		/**
-         * @brief Explicitly destroys all of the resources managed by this instance.
-        */
-		void destroy();
+		static Result<std::shared_ptr<RenderPass>, InitializeError> create(
+			VulkanInstance& instance, ResourceID resource_id, RenderPassCreateInfo& create_info);
 
 	private:
 		VkDevice m_device{ VK_NULL_HANDLE };
@@ -617,9 +611,7 @@ namespace ergovk
 			other.allocator = VK_NULL_HANDLE;
 			this->m_resources = std::move(other.m_resources);
 			this->m_frames = std::move(other.m_frames);
-			this->m_immediate_command_pool = std::move(other.m_immediate_command_pool);
 			this->m_immediate_command_buffer = other.m_immediate_command_buffer;
-			this->m_render_pass = std::move(other.m_render_pass);
 			this->m_sample_count = other.m_sample_count;
 			return *this;
 		};
@@ -710,9 +702,7 @@ namespace ergovk
 		VkQueue m_graphics_queue{ VK_NULL_HANDLE };
 		std::uint32_t m_graphics_queue_family{ 0 };
 		std::vector<RenderFrame> m_frames{};
-		CommandPool m_immediate_command_pool{};
 		VkCommandBuffer m_immediate_command_buffer{ VK_NULL_HANDLE };
-		RenderPass m_render_pass{};
 		VkSampleCountFlagBits m_sample_count{ VK_SAMPLE_COUNT_1_BIT };
 	};
 
@@ -883,5 +873,22 @@ namespace ergovk
 		 * @brief The default ergovk::Swapchain created by ergovk::VulkanInstanceBuilder.
 		*/
 		inline constexpr const char* RESID_SWAPCHAIN = "_ergovk_default_swapchain";
+
+		/**
+		 * @brief The default ergovk::CommandPool objects created by ergovk::VulkanInstanceBuilder.
+		 * The frame number will be appended to resource ID.
+		*/
+		inline constexpr const char* RESID_RENDERFRAME_COMMANDPOOL = "_ergovk_renderframe_commandpool_";
+
+		/**
+		 * @brief The default ergovk::CommandPool object created by ergovk::VulkanInstanceBuilder
+		 * to use for immediately-executed commands.
+		*/
+		inline constexpr const char* RESID_IMMEDIATE_COMMANDPOOL = "_ergovk_immediate_commandpool";
+
+		/**
+		 * @brief The default ergovk::RenderPass object created by ergovk::VulkanInstanceBuilder.
+		*/
+		inline constexpr const char* RESID_DEFAULT_RENDERPASS = "_ergovk_default_renderpass";
 	}
 }

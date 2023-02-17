@@ -14,17 +14,18 @@ namespace
 
 	/**
 	 * @brief Used by ergovk::VulkanInstanceBuilder::build() to create a default render pass.
-	 * @param device VkDevice
+	 * @param instance ergovk::VulkanInstance
 	 * @param swapchain_image_format VkFormat
 	 * @param depth_buffer_image_format VkFormat (if undefined, the depth buffer will be skipped)
 	 * @param sample_count VkSampleCountFlagBits
+	 * @returns std::shared_ptr<ergovk::RenderPass> or ergovk::InitializeError
 	*/
-	Result<RenderPass, InitializeError> create_render_pass(
-		VkDevice device, VkFormat swapchain_image_format, VkFormat depth_buffer_image_format,
+	Result<std::shared_ptr<RenderPass>, InitializeError> create_render_pass(
+		VulkanInstance & instance, VkFormat swapchain_image_format, VkFormat depth_buffer_image_format,
 		VkSampleCountFlagBits sample_count)
 	{
 
-		RenderPassCreateInfo create_info{ device };
+		RenderPassCreateInfo create_info{};
 		VkAttachmentDescription color_attachment{};
 		color_attachment.format = swapchain_image_format;
 		// 1 sample, no MSAA
@@ -109,7 +110,7 @@ namespace
 			create_info.add_subpass_dependency(depth_dependency);
 		}
 
-		return RenderPass::create(create_info);
+		return RenderPass::create(instance, defaults::RESID_DEFAULT_RENDERPASS,create_info);
 	}
 
 	VkSampleCountFlagBits get_desired_sample_count(
@@ -271,35 +272,35 @@ namespace ergovk
 			// create render frames and command pools
 			instance.m_frames.resize(this->m_render_frames);
 			CommandPoolCreateInfo command_pool_create_info{
-				.device = instance.device,
 				.graphics_queue_family = instance.m_graphics_queue_family,
 				.create_flag_bits = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
 			};
-			for (auto& frame : instance.m_frames)
+			for (std::size_t frame_idx = 0; frame_idx < instance.m_frames.size(); frame_idx++)
 			{
-				auto command_pool = CommandPool::create(command_pool_create_info);
+				command_pool_create_info.resource_id = defaults::RESID_RENDERFRAME_COMMANDPOOL;
+				command_pool_create_info.resource_id += std::to_string(frame_idx);
+				auto command_pool = CommandPool::create(instance, command_pool_create_info);
 				RETURN_IF_ERROR(command_pool);
-				frame.command_pool = unwrap(command_pool);
-				auto main_command_buffer = frame.command_pool.create_command_buffer();
+				instance.m_frames[frame_idx].command_pool = unwrap(command_pool);
+				auto main_command_buffer = instance.m_frames[frame_idx].command_pool->create_command_buffer();
 				RETURN_IF_ERROR(main_command_buffer);
-				frame.command_buffer = get_value(main_command_buffer);
+				instance.m_frames[frame_idx].command_buffer = get_value(main_command_buffer);
 			}
 
 			// create a separate command pool for "immediate" executed commands
 			// this is useful for uploading textures/meshes to the GPU
 			command_pool_create_info.create_flag_bits = static_cast<VkCommandPoolCreateFlagBits>(0);
-			auto command_pool = CommandPool::create(command_pool_create_info);
+			command_pool_create_info.resource_id = defaults::RESID_RENDERFRAME_COMMANDPOOL;
+			auto command_pool = CommandPool::create(instance, command_pool_create_info);
 			RETURN_IF_ERROR(command_pool);
-			instance.m_immediate_command_pool = unwrap(command_pool);
-			auto immed_command_buffer = instance.m_immediate_command_pool.create_command_buffer();
+			auto immed_command_buffer = get_value(command_pool)->create_command_buffer();
 			RETURN_IF_ERROR(immed_command_buffer);
 			instance.m_immediate_command_buffer = get_value(immed_command_buffer);
 
 			// create the default render pass
-			auto render_pass = create_render_pass(instance.device, get_value(swapchain_ret)->get_image_format(),
+			auto render_pass = create_render_pass(instance, get_value(swapchain_ret)->get_image_format(),
 				get_value(swapchain_ret)->get_depth_buffer_image_format(), instance.m_sample_count);
 			RETURN_IF_ERROR(render_pass);
-			instance.m_render_pass = unwrap(render_pass);
 
 			return instance;
 		}

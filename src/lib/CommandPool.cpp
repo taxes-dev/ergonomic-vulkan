@@ -2,7 +2,7 @@
 
 namespace ergovk
 {
-	void CommandPool::destroy()
+	CommandPool::~CommandPool()
 	{
 		if (this->m_command_pool)
 		{
@@ -11,18 +11,21 @@ namespace ergovk
 		}
 	}
 
-	Result<CommandPool, InitializeError> CommandPool::create(CommandPoolCreateInfo create_info)
+	Result<std::shared_ptr<CommandPool>, InitializeError> CommandPool::create(
+		VulkanInstance& instance, CommandPoolCreateInfo create_info)
 	{
 		auto command_pool_info = ergovk::structs::create<VkCommandPoolCreateInfo>();
 		command_pool_info.flags = create_info.create_flag_bits;
 		command_pool_info.queueFamilyIndex = create_info.graphics_queue_family;
 		VkCommandPool vk_command_pool;
-		VkResult result = vkCreateCommandPool(create_info.device, &command_pool_info, nullptr, &vk_command_pool);
+		VkResult result = vkCreateCommandPool(instance.device, &command_pool_info, nullptr, &vk_command_pool);
 		if (result != VK_SUCCESS)
 		{
 			return InitializeError::CommandPoolCreate;
 		}
-		return CommandPool{ create_info.device, vk_command_pool };
+		auto command_pool = std::make_shared<CommandPool>(instance.device, vk_command_pool);
+		instance.resources<CommandPool>().insert(create_info.resource_id, command_pool);
+		return command_pool;
 	}
 
 	Result<VkCommandBuffer, InitializeError> CommandPool::create_command_buffer(VkCommandBufferLevel level)
