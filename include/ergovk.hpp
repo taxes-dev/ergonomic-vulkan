@@ -2,6 +2,9 @@
 #include <concepts>
 #include <functional>
 #include <memory>
+#include <typeindex>
+#include <typeinfo>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -612,7 +615,7 @@ namespace ergovk
 			this->m_graphics_queue_family = other.m_graphics_queue_family;
 			this->allocator = other.allocator;
 			other.allocator = VK_NULL_HANDLE;
-			this->swapchains = std::move(other.swapchains);
+			this->m_resources = std::move(other.m_resources);
 			this->m_frames = std::move(other.m_frames);
 			this->m_immediate_command_pool = std::move(other.m_immediate_command_pool);
 			this->m_immediate_command_buffer = other.m_immediate_command_buffer;
@@ -682,13 +685,26 @@ namespace ergovk
 		VmaAllocator allocator{ VK_NULL_HANDLE };
 
 		/**
-		 * @brief Set of managed ergovk::Swapchain resources.
+		 * @brief Get a resource set for the type \p T.
+		 * @returns ergovk::resources::ResourceSet<T>
+		 * @note If one does not exist yet, it will be created.
 		*/
-		resources::ResourceSet<Swapchain> swapchains{};
+		template <typename T>
+		resources::ResourceSet<T>& resources()
+		{
+			auto key = std::type_index(typeid(T));
+			if (!this->m_resources.contains(key))
+			{
+				std::unique_ptr<resources::ResourceSetBase> set{ new resources::ResourceSet<T>() };
+				this->m_resources[key] = std::move(set);
+			}
+			return *reinterpret_cast<resources::ResourceSet<T>*>(this->m_resources.at(key).get());
+		};
 
 	private:
 		VulkanInstance() noexcept {};
 
+		std::unordered_map<std::type_index, std::unique_ptr<resources::ResourceSetBase>> m_resources{};
 		VkDebugUtilsMessengerEXT m_debug_messenger{ VK_NULL_HANDLE };
 		VkPhysicalDeviceProperties m_physical_device_properties{};
 		VkQueue m_graphics_queue{ VK_NULL_HANDLE };

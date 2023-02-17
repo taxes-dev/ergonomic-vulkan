@@ -88,7 +88,7 @@ namespace ergovk
 			swapchain->m_depth_image_view = unwrap(depth_imageview_ret);
 		}
 
-		 instance.swapchains.insert(create_info.resource_id, swapchain);
+		 instance.resources<Swapchain>().insert(create_info.resource_id, swapchain);
 		 return swapchain;
 	}
 

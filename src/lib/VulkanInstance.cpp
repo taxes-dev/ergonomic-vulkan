@@ -9,8 +9,7 @@ namespace ergovk
 		this->m_render_pass.destroy();
 		this->m_immediate_command_pool.destroy();
 		this->m_frames.clear();
-		//this->m_swapchain.destroy();
-		this->swapchains.reset();
+		this->m_resources.clear();
 		if (this->allocator)
 		{
 			vmaDestroyAllocator(this->allocator);
