@@ -150,21 +150,11 @@ namespace ergovk
 {
 	VulkanInstanceBuilder::VulkanInstanceBuilder() noexcept
 	{
-		this->m_builder = new vkb::InstanceBuilder();
-		this->m_builder->require_api_version(1, 1, 0);
-#ifdef ERGOVK_DEBUG
-		this->m_builder->request_validation_layers(true);
-		this->m_builder->use_default_debug_messenger();
-#endif
 		this->m_create_surface_callback = [](VkInstance) { return VK_NULL_HANDLE; };
 	}
 
 	VulkanInstanceBuilder::~VulkanInstanceBuilder()
 	{
-		if (this->m_builder)
-		{
-			delete this->m_builder;
-		}
 	}
 
 	VulkanInstanceBuilder& VulkanInstanceBuilder::set_create_surface_callback(CreateSurfaceCallback&& callback)
@@ -176,7 +166,7 @@ namespace ergovk
 	VulkanInstanceBuilder& VulkanInstanceBuilder::set_custom_debug_callback(
 		PFN_vkDebugUtilsMessengerCallbackEXT callback)
 	{
-		this->m_builder->set_debug_callback(callback);
+		this->m_debug_callback = callback;
 		return *this;
 	}
 
@@ -190,7 +180,18 @@ namespace ergovk
 
 	Result<VulkanInstance, InitializeError> VulkanInstanceBuilder::build() const
 	{
-		auto build_ret = this->m_builder->build();
+		vkb::InstanceBuilder vkb_builder{};
+		vkb_builder.require_api_version(1, 1, 0);
+#ifdef ERGOVK_DEBUG
+		vkb_builder.request_validation_layers(true);
+		vkb_builder.use_default_debug_messenger();
+#endif
+		if (this->m_debug_callback)
+		{
+			vkb_builder.set_debug_callback(this->m_debug_callback);
+		}
+
+		auto build_ret = vkb_builder.build();
 		if (build_ret)
 		{
 			VulkanInstance instance{};

@@ -8,18 +8,13 @@
 #include <vulkan/vulkan.h>
 #include <vma/vk_mem_alloc.h>
 
-#include "ergovk_result.hpp"
-#include "ergovk_structs.hpp"
-#include "ergovk_resources.hpp"
-
 #ifndef NDEBUG
 #define ERGOVK_DEBUG
 #endif
 
-namespace vkb
-{
-	class InstanceBuilder;
-}
+#include "ergovk_result.hpp"
+#include "ergovk_structs.hpp"
+#include "ergovk_resources.hpp"
 
 namespace ergovk
 {
@@ -791,7 +786,7 @@ namespace ergovk
 		[[nodiscard]] Result<VulkanInstance, InitializeError> build() const;
 
 	private:
-		vkb::InstanceBuilder* m_builder{ nullptr };
+		PFN_vkDebugUtilsMessengerCallbackEXT m_debug_callback{nullptr};
 		CreateSurfaceCallback m_create_surface_callback{};
 		VkExtent2D m_extent{ 1, 1 };
 		bool m_create_depth_buffer{ true };
