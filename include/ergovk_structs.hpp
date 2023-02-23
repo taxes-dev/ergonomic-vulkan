@@ -35,6 +35,22 @@ namespace ergovk::structs
 	};
 
 	template <>
+	inline VkFramebufferCreateInfo create()
+	{
+		return VkFramebufferCreateInfo{
+			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+			.pNext = VK_NULL_HANDLE,
+			.attachmentCount = 0,
+			.flags = 0,
+			.height = 0,
+			.layers = 1,
+			.pAttachments = VK_NULL_HANDLE,
+			.renderPass = VK_NULL_HANDLE,
+			.width = 0,
+		};
+	};
+
+	template <>
 	inline VkImageCreateInfo create()
 	{
 		return VkImageCreateInfo{
@@ -61,6 +77,12 @@ namespace ergovk::structs
 			    .baseArrayLayer = 0,
 			    .layerCount = 1,
             },
+			.components = {
+				.r = VK_COMPONENT_SWIZZLE_R,
+				.g = VK_COMPONENT_SWIZZLE_G,
+				.b = VK_COMPONENT_SWIZZLE_B,
+				.a = VK_COMPONENT_SWIZZLE_A,
+			}
 		};
 	};
 

@@ -2,7 +2,7 @@
 
 namespace ergovk
 {
-	void VkImageViewHandle::destroy()
+	VkImageViewHandle::~VkImageViewHandle()
 	{
 		if (this->image_view)
 		{
@@ -11,13 +11,16 @@ namespace ergovk
 		}
 	};
 
-	Result<VkImageViewHandle, VkResult> VkImageViewHandle::create(VkDevice device, VkImageViewCreateInfo create_info)
+	Result<std::shared_ptr<VkImageViewHandle>, VkResult> VkImageViewHandle::create(
+		VulkanInstance& instance, ResourceID resource_id, VkImageViewCreateInfo create_info)
 	{
 		VkImageView image_view{ VK_NULL_HANDLE };
-		VkResult result = vkCreateImageView(device, &create_info, nullptr, &image_view);
+		VkResult result = vkCreateImageView(instance.device, &create_info, nullptr, &image_view);
 		if (result == VkResult::VK_SUCCESS)
 		{
-			return VkImageViewHandle{ device, image_view };
+			auto handle = std::make_shared<VkImageViewHandle>(instance.device, image_view);
+			instance.resources<VkImageViewHandle>().insert(resource_id, handle);
+			return handle;
 		}
 		return result;
 	}

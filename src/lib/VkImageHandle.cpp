@@ -2,7 +2,7 @@
 
 namespace ergovk
 {
-	void VkImageHandle::destroy()
+	VkImageHandle::~VkImageHandle()
 	{
 		if (this->image)
 		{
@@ -12,16 +12,18 @@ namespace ergovk
 		}
 	};
 
-	Result<VkImageHandle, VkResult> VkImageHandle::create(VmaAllocator allocator, VkDevice device,
-		VkImageCreateInfo create_info, VmaAllocationCreateInfo allocation_create_info)
+	Result<std::shared_ptr<VkImageHandle>, VkResult> VkImageHandle::create(VulkanInstance& instance,
+		ResourceID resource_id, VkImageCreateInfo create_info, VmaAllocationCreateInfo allocation_create_info)
 	{
 		VkImage image{ VK_NULL_HANDLE };
 		VmaAllocation allocation{ VK_NULL_HANDLE };
 		VkResult result =
-			vmaCreateImage(allocator, &create_info, &allocation_create_info, &image, &allocation, nullptr);
+			vmaCreateImage(instance.allocator, &create_info, &allocation_create_info, &image, &allocation, nullptr);
 		if (result == VK_SUCCESS)
 		{
-			return VkImageHandle{ allocator, device, image, allocation };
+			auto handle = std::make_shared<VkImageHandle>(instance.allocator, instance.device, image, allocation);
+			instance.resources<VkImageHandle>().insert(resource_id, handle);
+			return handle;
 		}
 
 		return result;

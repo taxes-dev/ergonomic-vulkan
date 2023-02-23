@@ -49,6 +49,16 @@ namespace ergovk
 		*/
 		FailedCreate,
 		/**
+		 * @brief Could not create a frame buffer.
+		 * @see ergovk::FrameBuffer::create()
+		*/
+		FrameBufferCreate,
+		/**
+		 * @brief Extents must have greater than zero width/height.
+		 * @see ergovk::Swapchain::create()
+		*/
+		InvalidExtents,
+		/**
 		 * @brief Cannot find a GPU that matches the requirements for rendering.
 		 * @see ergovk::VulkanInstanceBuilder::build()
 		 */
@@ -58,6 +68,16 @@ namespace ergovk
 		 * @see ergovk::VulkanInstanceBuilder::build()
 		 */
 		SurfaceCreate,
+		/**
+		 * @brief Could not allocate the color image buffer.
+		 * @see ergovk::Swapchain::create()
+		*/
+		ColorImageAllocation,
+		/**
+		 * @brief Could not allocate the color image view.
+		 * @see ergovk::Swapchain::create()
+		*/
+		ColorImageViewAllocation,
 		/**
 		 * @brief Could not allocate the depth image buffer.
 		 * @see ergovk::Swapchain::create()
@@ -73,6 +93,11 @@ namespace ergovk
 		 * @see ergovk::RenderPass::create()
 		*/
 		RenderPassCreate,
+		/**
+		 * @brief Creation requires a render pass and at least one image view.
+		 * @see ergovk::FrameBuffer::create()
+		*/
+		RenderPassAndImageViewsRequired,
 		/**
 		 * @brief Initial creation of VkSwapchainKHR failed.
 		 * @see ergovk::Swapchain::create()
@@ -126,7 +151,7 @@ namespace ergovk
 			assert(image != VK_NULL_HANDLE);
 			assert(allocation != VK_NULL_HANDLE);
 		};
-		~VkImageHandle() { this->destroy(); }
+		~VkImageHandle();
 		VkImageHandle(const VkImageHandle&) = delete;
 		VkImageHandle(VkImageHandle&& other) noexcept { *this = std::move(other); };
 		VkImageHandle& operator=(const VkImageHandle&) = delete;
@@ -143,19 +168,14 @@ namespace ergovk
 
 		/**
          * @brief Allocates a new image buffer and returns the handle.
-         * @param allocator VmaAllocator
-         * @param device VkDevice
+		 * @param instance ergovk::VulkanInstance
+		 * @param resource_id ergovk::resources::ResourceID
          * @param create_info VkImageCreateInfo
          * @param allocation_create_info VmaAllocationCreateInfo
-         * @return ergovk::VkImageHandle on success, otherwise VkResult
+         * @return std::shared_ptr<ergovk::VkImageHandle> on success, otherwise VkResult
         */
-		static Result<VkImageHandle, VkResult> create(VmaAllocator allocator, VkDevice device,
+		static Result<std::shared_ptr<VkImageHandle>, VkResult> create(VulkanInstance & instance, ResourceID resource_id,
 			VkImageCreateInfo create_info, VmaAllocationCreateInfo allocation_create_info);
-
-		/**
-         * @brief Explicitly destroys all of the resources managed by this instance.
-        */
-		void destroy();
 
 		/**
          * @brief Handle to the image buffer.
@@ -192,7 +212,7 @@ namespace ergovk
 			assert(device != VK_NULL_HANDLE);
 			assert(image_view != VK_NULL_HANDLE);
 		};
-		~VkImageViewHandle() { this->destroy(); };
+		~VkImageViewHandle();
 		VkImageViewHandle(const VkImageViewHandle&) = delete;
 		VkImageViewHandle(VkImageViewHandle&& other) noexcept { *this = std::move(other); }
 		VkImageViewHandle& operator=(const VkImageViewHandle&) = delete;
@@ -207,15 +227,12 @@ namespace ergovk
 		/**
          * @brief Allocates a new image view and returns the handle.
          * @param device VkDevice
+		 * @param resource_id ResourceID
          * @param create_info VkImageViewCreateInfo
-         * @return ergovk::VkImageViewHandle on success, otherwise VkResult
+         * @return std::shared_ptr<ergovk::VkImageViewHandle> on success, otherwise VkResult
         */
-		static Result<VkImageViewHandle, VkResult> create(VkDevice device, VkImageViewCreateInfo create_info);
-
-		/**
-         * @brief Explicitly destroys all of the resources managed by this instance.
-        */
-		void destroy();
+		static Result<std::shared_ptr<VkImageViewHandle>, VkResult> create(
+			VulkanInstance& instance, ResourceID resource_id, VkImageViewCreateInfo create_info);
 
 		/**
          * @brief Handle to the image view.
@@ -243,6 +260,10 @@ namespace ergovk
 		 * @brief If true, create an accompanying depth buffer.
 		*/
 		bool create_depth_buffer{ false };
+		/**
+		 * @brief Sample count for the color buffer.
+		*/
+	VkSampleCountFlagBits sample_count{VK_SAMPLE_COUNT_1_BIT};
 	};
 
 	/**
@@ -265,7 +286,9 @@ namespace ergovk
 			this->m_swapchain = other.m_swapchain;
 			other.m_swapchain = VK_NULL_HANDLE;
 			this->m_images = std::move(other.m_images);
-			this->m_image_views = std::move(other.m_image_views);
+			this->m_present_image_view = std::move(other.m_present_image_view);
+			this->m_color_image = std::move(other.m_color_image);
+			this->m_color_image_view = std::move(other.m_color_image_view);
 			this->m_image_format = other.m_image_format;
 			this->m_depth_format = other.m_depth_format;
 			this->m_depth_image = std::move(other.m_depth_image);
@@ -286,7 +309,7 @@ namespace ergovk
 		 * @brief Returns a value indicating if this ergovk::Swapchain has a depth buffer.
 		 * @return true if this ergovk::Swapchain has a depth buffer, otherwise false.
 		*/
-		bool has_depth_buffer() const { return this->m_depth_image.image != VK_NULL_HANDLE; };
+		bool has_depth_buffer() const { return this->m_depth_image != nullptr; };
 
 		/**
 		 * @brief Get the image format of the swapchain.
@@ -300,16 +323,37 @@ namespace ergovk
 		*/
 		VkFormat get_depth_buffer_image_format() const { return this->m_depth_format; };
 
+		/**
+		 * @brief Get the color image view connected to this swapchain.
+		 * @return std::shared_ptr<ergovk::VkImageViewHandle>
+		*/
+		std::shared_ptr<VkImageViewHandle> get_color_image_view() { return this->m_color_image_view; };
+
+		/**
+		 * @brief Get the presentation image view connected to this swapchain.
+		*/
+		std::shared_ptr<VkImageViewHandle> get_present_image_view() {return this->m_present_image_view;};
+
+		/**
+		 * @brief Get the depth buffer image view.
+		 * @return std::shared_ptr<ergovk::VkImageViewHandle>
+		 * @note Return object will be empty if there is no depth buffer.
+		 * @see ergovk::Swapchain::has_depth_buffer()
+		*/
+		std::shared_ptr<VkImageViewHandle> get_depth_buffer_image_view() { return this->m_depth_image_view; };
+
 	private:
 		VkDevice m_device{ VK_NULL_HANDLE };
 		VkSwapchainKHR m_swapchain{ VK_NULL_HANDLE };
 		// m_images doesn't use a wrapper b/c it will be cleaned up when m_swapchain is destroyed
 		std::vector<VkImage> m_images{};
-		std::vector<VkImageViewHandle> m_image_views{};
+		std::shared_ptr<VkImageViewHandle> m_present_image_view{};
+		std::shared_ptr<VkImageHandle> m_color_image{};
+		std::shared_ptr<VkImageViewHandle> m_color_image_view{};
 		VkFormat m_image_format{ VkFormat::VK_FORMAT_UNDEFINED };
 		VkFormat m_depth_format{ VkFormat::VK_FORMAT_UNDEFINED };
-		VkImageHandle m_depth_image{};
-		VkImageViewHandle m_depth_image_view{};
+		std::shared_ptr<VkImageHandle> m_depth_image{};
+		std::shared_ptr<VkImageViewHandle> m_depth_image_view{};
 	};
 
 	/**
@@ -501,9 +545,50 @@ namespace ergovk
 		static Result<std::shared_ptr<RenderPass>, InitializeError> create(
 			VulkanInstance& instance, ResourceID resource_id, RenderPassCreateInfo& create_info);
 
+		/**
+		 * @brief Get the render pass handle.
+		 * @return VkRenderPass
+		*/
+		VkRenderPass get_render_pass() const { return this->m_render_pass; };
+
 	private:
 		VkDevice m_device{ VK_NULL_HANDLE };
 		VkRenderPass m_render_pass{ VK_NULL_HANDLE };
+	};
+
+	struct FrameBufferCreateInfo
+	{
+		ResourceID resource_id{};
+		std::shared_ptr<RenderPass> render_pass{};
+		std::vector<std::shared_ptr<VkImageViewHandle>> image_views{};
+		std::shared_ptr<VkImageViewHandle> depth_buffer{};
+		VkExtent2D extents{};
+		VkFramebufferCreateFlags flags{0};
+	};
+
+	class FrameBuffer
+	{
+	public:
+		FrameBuffer(VkDevice device, VkFramebuffer frame_buffer)
+			: m_device{ device }, m_frame_buffer{ frame_buffer } {};
+		~FrameBuffer();
+		FrameBuffer(const FrameBuffer&) = delete;
+		FrameBuffer(FrameBuffer&& other) noexcept { *this = std::move(other); };
+		FrameBuffer& operator=(const FrameBuffer&) = delete;
+		FrameBuffer& operator=(FrameBuffer&& other) noexcept
+		{
+			this->m_device = other.m_device;
+			this->m_frame_buffer = other.m_frame_buffer;
+			other.m_frame_buffer = VK_NULL_HANDLE;
+			return *this;
+		};
+
+		static Result<std::shared_ptr<FrameBuffer>, InitializeError> create(
+			VulkanInstance& instance, FrameBufferCreateInfo& create_info);
+
+	private:
+		VkDevice m_device{ VK_NULL_HANDLE };
+		VkFramebuffer m_frame_buffer{ VK_NULL_HANDLE };
 	};
 
 	/**
@@ -786,7 +871,7 @@ namespace ergovk
 		[[nodiscard]] Result<VulkanInstance, InitializeError> build() const;
 
 	private:
-		PFN_vkDebugUtilsMessengerCallbackEXT m_debug_callback{nullptr};
+		PFN_vkDebugUtilsMessengerCallbackEXT m_debug_callback{ nullptr };
 		CreateSurfaceCallback m_create_surface_callback{};
 		VkExtent2D m_extent{ 1, 1 };
 		bool m_create_depth_buffer{ true };
@@ -817,5 +902,11 @@ namespace ergovk
 		 * @brief The default ergovk::RenderPass object created by ergovk::VulkanInstanceBuilder.
 		*/
 		inline constexpr const char* RESID_DEFAULT_RENDERPASS = "_ergovk_default_renderpass";
+
+		/**
+		 * @brief The default ergovk::FrameBuffer objects created by ergovk::VulkanInstanceBuilder.
+		 * The frame number will be appended to the resource ID.
+		*/
+		inline constexpr const char* RESID_FRAMEBUFFER = "_ergovk_framebuffer_";
 	}
 }

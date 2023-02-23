@@ -6,7 +6,7 @@ namespace ergovk
 	void VulkanInstance::destroy()
 	{
 		this->wait_for_idle();
-		this->m_frames.clear();
+		this->m_frames.clear();		
 		this->m_resources.clear();
 		if (this->allocator)
 		{

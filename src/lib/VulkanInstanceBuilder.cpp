@@ -28,19 +28,13 @@ namespace
 		RenderPassCreateInfo create_info{};
 		VkAttachmentDescription color_attachment{};
 		color_attachment.format = swapchain_image_format;
-		// 1 sample, no MSAA
 		color_attachment.samples = sample_count;
-		// clear when attachment is loaded
 		color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		// store when renderpass ends
-		color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		// don't care about stencils
+		color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		// also don't care
 		color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		// at end of renderpass, should be ready to display
-		color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		color_attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		VkAttachmentReference color_attachment_ref{};
 		// attachment number will index into pAttachments in the parent renderpass
@@ -49,6 +43,23 @@ namespace
 
 		// attach to create info
 		create_info.add_attachment_description(color_attachment);
+
+		// for present
+		VkAttachmentDescription present_attachment{};
+		present_attachment.format = swapchain_image_format;
+		present_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		present_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		present_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		present_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		present_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		present_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		present_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+		VkAttachmentReference present_attachment_ref{};
+		present_attachment_ref.attachment = 1;
+		present_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		create_info.add_attachment_description(present_attachment);
 
 		// for depth buffer
 		VkAttachmentDescription depth_attachment{};
@@ -63,7 +74,7 @@ namespace
 		depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 		VkAttachmentReference depth_attachment_ref{};
-		depth_attachment_ref.attachment = 1;
+		depth_attachment_ref.attachment = 2;
 		depth_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 		// attach to create info
@@ -77,6 +88,7 @@ namespace
 		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		subpass.colorAttachmentCount = 1;
 		subpass.pColorAttachments = &color_attachment_ref;
+		subpass.pResolveAttachments = &present_attachment_ref;
 		if (depth_buffer_image_format != VK_FORMAT_UNDEFINED)
 		{
 			subpass.pDepthStencilAttachment = &depth_attachment_ref;
@@ -266,6 +278,7 @@ namespace ergovk
 				.extent = this->m_extent,
 				.create_depth_buffer = this->m_create_depth_buffer,
 				.resource_id = defaults::RESID_SWAPCHAIN,
+				.sample_count = instance.m_sample_count,
 			};
 			auto swapchain_ret = Swapchain::create(instance, swapchain_create_info);
 			RETURN_IF_ERROR(swapchain_ret);
@@ -302,6 +315,23 @@ namespace ergovk
 			auto render_pass = create_render_pass(instance, get_value(swapchain_ret)->get_image_format(),
 				get_value(swapchain_ret)->get_depth_buffer_image_format(), instance.m_sample_count);
 			RETURN_IF_ERROR(render_pass);
+
+			// connect renderpass to swapchain images
+			FrameBufferCreateInfo fb_create_info{
+				.extents = this->m_extent,
+				.render_pass = get_value(render_pass),
+			};
+			fb_create_info.image_views.push_back(get_value(swapchain_ret)->get_color_image_view());
+			fb_create_info.image_views.push_back(get_value(swapchain_ret)->get_present_image_view());
+			if (this->m_create_depth_buffer) {
+				fb_create_info.depth_buffer = get_value(swapchain_ret)->get_depth_buffer_image_view();
+			}
+			for (std::size_t fb_idx = 0; fb_idx < this->m_render_frames; fb_idx++)
+			{
+				fb_create_info.resource_id = defaults::RESID_FRAMEBUFFER + std::to_string(fb_idx);
+				auto frame_buffer = FrameBuffer::create(instance, fb_create_info);
+				RETURN_IF_ERROR(frame_buffer);				
+			}
 
 			return instance;
 		}
